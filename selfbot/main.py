@@ -75,6 +75,15 @@ async def main():
     client = VibeClient(session_path=str(cfg.session_path))
     storage = GistStorage(cfg.gh_token, cfg.gist_id, cfg.gist_filename)
 
+    # Verify Gist access before connecting to Vibe
+    try:
+        await storage._ensure_cache()
+        _log("gist loaded successfully")
+    except Exception as e:
+        _log(f"FATAL: Failed to load gist: {e}")
+        _log("Please check your GH_TOKEN (must have 'gist' scope) and GIST_ID.")
+        sys.exit(3)
+
     try:
         await client.connect()
         _log("connected")

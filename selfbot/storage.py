@@ -25,9 +25,15 @@ class GistStorage:
     async def _load_from_gist(self, session):
         url = f"{GITHUB_API}/gists/{self._gist_id}"
         async with session.get(url, headers=self._headers) as r:
+            if r.status == 401:
+                raise RuntimeError("GH_TOKEN is invalid or missing 'gist' scope")
+            if r.status == 404:
+                raise RuntimeError(f"GIST_ID '{self._gist_id}' not found")
             if r.status != 200:
-                raise RuntimeError(f"gist load failed: {r.status}")
+                raise RuntimeError(f"gist load failed with status {r.status}")
+            
             data = await r.json()
+            
         files = data.get("files") or {}
         entry = files.get(self._filename)
         if not entry:
