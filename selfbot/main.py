@@ -19,7 +19,7 @@ def _log(msg):
 
 async def _run_once(client, storage, config):
     from telethon.tl.functions.messages import GetDialogsRequest
-    from telethon.tl.types import InputPeerEmpty
+    from telethon.tl.types import InputPeerEmpty, PeerUser
     
     replied_count = 0
     try:
@@ -28,14 +28,26 @@ async def _run_once(client, storage, config):
             limit=300, hash=0,
         ))
         
-        # We only care about the Dialog objects.
-        # We don't need to map entities because dialog.peer has the access_hash.
+        # Map valid users
+        users_map = {u.id: u for u in (result.users or [])}
+        
         for d in (result.dialogs or []):
+            # In Telethon, dialog.peer is a PeerUser, not InputPeerUser
+            if not isinstance(d.peer, PeerUser):
+                continue
+                
+            user_id = d.peer.user_id
+            entity = users_map.get(user_id)
+            
+            if not entity:
+                continue
+                
             try:
-                if await process_dialog(client, d, storage, config, _log):
+                if await process_dialog(client, d, entity, storage, config, _log):
                     replied_count += 1
             except Exception as e:
-                _log(f"dialog error: {type(e).__name__}: {e}")
+                _log(f"dialog error for {user_id}: {type(e).__name__}: {e}")
+                
     except Exception as e:
         _log(f"GetDialogsRequest error: {type(e).__name__}: {e}")
         

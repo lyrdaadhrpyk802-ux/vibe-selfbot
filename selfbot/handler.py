@@ -3,51 +3,52 @@
 #  All code and comments are English. No emojis.
 # ============================================
 import asyncio
-from telethon.tl.types import InputPeerUser
 
-async def _last_message(client, peer):
+async def _last_message(client, entity, log, user_id):
     try:
-        msgs = await client.get_messages(peer, limit=1)
+        msgs = await client.get_messages(entity, limit=1)
         if not msgs:
             return None
         return msgs[0]
-    except Exception:
+    except Exception as e:
+        log(f"get_messages error for {user_id}: {type(e).__name__}: {e}")
         return None
 
-async def process_dialog(client, dialog, storage, config, log):
-    # Only process private user chats
-    if not isinstance(dialog.peer, InputPeerUser):
+async def process_dialog(client, dialog, entity, storage, config, log):
+    user_id = entity.id
+    
+    if getattr(entity, "bot", False) or getattr(entity, "deleted", False):
         return False
-
-    user_id = dialog.peer.user_id
 
     replied = await storage.get_replied()
     if user_id in replied:
         return False
 
-    # dialog.peer is an InputPeer containing the access_hash.
-    # Passing it directly prevents Telethon from doing a database lookup.
-    peer = dialog.peer
-
-    last = await _last_message(client, peer)
-    if last is None or getattr(last, "out", False):
+    last = await _last_message(client, entity, log, user_id)
+    if last is None:
+        return False
+    if getattr(last, "out", False):
         return False
 
-    # Wait 5 seconds to batch consecutive messages
+    log(f"waiting {config.delay_seconds}s for {user_id} before replying")
     await asyncio.sleep(config.delay_seconds)
 
-    last2 = await _last_message(client, peer)
+    last2 = await _last_message(client, entity, log, user_id)
     if last2 is None or getattr(last2, "out", False):
+        log(f"skip {user_id}: condition changed after delay")
         return False
 
     try:
-        sent = await client.send_message(peer, config.reply_text)
+        log(f"sending reply to {user_id}")
+        sent = await client.send_message(entity, config.reply_text)
         if sent is not None and getattr(sent, "id", None):
             try:
-                await client.pin_message(peer, sent.id, notify=False)
+                await client.pin_message(entity, sent.id, notify=False)
+                log(f"pinned message for {user_id}")
             except Exception as e:
                 log(f"pin failed for user {user_id}: {type(e).__name__}: {e}")
         await storage.add_replied(user_id)
+        log(f"successfully replied to {user_id}")
         return True
     except Exception as e:
         log(f"send failed for user {user_id}: {type(e).__name__}: {e}")
