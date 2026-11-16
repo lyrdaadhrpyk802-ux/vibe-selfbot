@@ -5,6 +5,8 @@
 import asyncio
 import base64
 import sys
+import re
+import hashlib
 import time
 
 from selfbot.config import Config
@@ -29,7 +31,16 @@ async def _run_once(client, storage, config):
 async def main():
     cfg = Config()
     try:
-        raw = base64.b64decode(cfg.session_b64)
+        # Remove any non-base64 characters (spaces, newlines, etc.)
+        b64_clean = re.sub(r'[^A-Za-z0-9+/=]', '', cfg.session_b64)
+        # Add padding if missing
+        padding = len(b64_clean) % 4
+        if padding:
+            b64_clean += "=" * (4 - padding)
+            
+        raw = base64.b64decode(b64_clean)
+        _log(f"decoded session size: {len(raw)} bytes")
+        _log(f"session md5 hash: {hashlib.md5(raw).hexdigest()}")
     except Exception as e:
         _log(f"session decode error: {e}")
         sys.exit(1)
