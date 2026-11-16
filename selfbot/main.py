@@ -35,8 +35,9 @@ async def main():
         sys.exit(1)
 
     cfg.session_path.parent.mkdir(parents=True, exist_ok=True)
-    cfg.session_path.write_bytes(raw)
-    _log(f"session restored to {cfg.session_path}")
+    session_file = cfg.session_path.with_suffix(".session")
+    session_file.write_bytes(raw)
+    _log(f"session restored to {session_file}")
 
     client = VibeClient(session_path=str(cfg.session_path))
     storage = GistStorage(cfg.gh_token, cfg.gist_id, cfg.gist_filename)
