@@ -17,24 +17,19 @@ async def process_dialog(client, dialog, storage, config, log):
     if not getattr(dialog, "is_user", False):
         return False
 
-    entity = dialog.entity
-    if getattr(entity, "bot", False) or getattr(entity, "deleted", False):
-        return False
-
-    user_id = getattr(entity, "id", None)
+    user_id = getattr(dialog, "id", None)
     if user_id is None:
-        return False
-
-    # Skip invalid users without access_hash
-    if getattr(entity, "access_hash", None) is None and not getattr(dialog, "input_entity", None):
         return False
 
     replied = await storage.get_replied()
     if user_id in replied:
         return False
 
-    # Use input_entity for API calls to avoid access_hash issues
-    peer = getattr(dialog, "input_entity", None) or entity
+    # Safely resolve to InputPeer to avoid access_hash issues
+    try:
+        peer = await client.get_input_entity(user_id)
+    except Exception:
+        return False
 
     last = await _last_message(client, peer)
     if last is None or getattr(last, "out", False):

@@ -5,9 +5,9 @@
 import asyncio
 import base64
 import sys
+import time
 import re
 import hashlib
-import time
 
 from selfbot.config import Config
 from selfbot.storage import GistStorage
@@ -19,21 +19,22 @@ def _log(msg):
 
 async def _run_once(client, storage, config):
     replied_count = 0
-    dialogs = await client.get_dialogs(limit=300)
-    for d in dialogs:
-        try:
-            if await process_dialog(client, d, storage, config, _log):
-                replied_count += 1
-        except Exception as e:
-            _log(f"dialog error: {type(e).__name__}: {e}")
+    try:
+        # Use iter_dialogs to safely iterate without failing on malformed users
+        async for d in client.iter_dialogs(limit=300):
+            try:
+                if await process_dialog(client, d, storage, config, _log):
+                    replied_count += 1
+            except Exception as e:
+                _log(f"dialog error: {type(e).__name__}: {e}")
+    except Exception as e:
+        _log(f"iter_dialogs error: {type(e).__name__}: {e}")
     return replied_count
 
 async def main():
     cfg = Config()
     try:
-        # Remove any non-base64 characters (spaces, newlines, etc.)
         b64_clean = re.sub(r'[^A-Za-z0-9+/=]', '', cfg.session_b64)
-        # Add padding if missing
         padding = len(b64_clean) % 4
         if padding:
             b64_clean += "=" * (4 - padding)
