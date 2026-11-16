@@ -3,6 +3,7 @@
 #  All code and comments are English. No emojis.
 # ============================================
 import asyncio
+from telethon.tl.types import InputPeerUser
 
 async def _last_message(client, peer):
     try:
@@ -14,27 +15,25 @@ async def _last_message(client, peer):
         return None
 
 async def process_dialog(client, dialog, storage, config, log):
-    if not getattr(dialog, "is_user", False):
+    # Only process private user chats
+    if not isinstance(dialog.peer, InputPeerUser):
         return False
 
-    user_id = getattr(dialog, "id", None)
-    if user_id is None:
-        return False
+    user_id = dialog.peer.user_id
 
     replied = await storage.get_replied()
     if user_id in replied:
         return False
 
-    # Safely resolve to InputPeer to avoid access_hash issues
-    try:
-        peer = await client.get_input_entity(user_id)
-    except Exception:
-        return False
+    # dialog.peer is an InputPeer containing the access_hash.
+    # Passing it directly prevents Telethon from doing a database lookup.
+    peer = dialog.peer
 
     last = await _last_message(client, peer)
     if last is None or getattr(last, "out", False):
         return False
 
+    # Wait 5 seconds to batch consecutive messages
     await asyncio.sleep(config.delay_seconds)
 
     last2 = await _last_message(client, peer)

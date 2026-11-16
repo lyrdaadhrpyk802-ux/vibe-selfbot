@@ -18,17 +18,27 @@ def _log(msg):
     print(f"[selfbot] {msg}", flush=True)
 
 async def _run_once(client, storage, config):
+    from telethon.tl.functions.messages import GetDialogsRequest
+    from telethon.tl.types import InputPeerEmpty
+    
     replied_count = 0
     try:
-        # Use iter_dialogs to safely iterate without failing on malformed users
-        async for d in client.iter_dialogs(limit=300):
+        result = await client.raw(GetDialogsRequest(
+            offset_date=None, offset_id=0, offset_peer=InputPeerEmpty(),
+            limit=300, hash=0,
+        ))
+        
+        # We only care about the Dialog objects.
+        # We don't need to map entities because dialog.peer has the access_hash.
+        for d in (result.dialogs or []):
             try:
                 if await process_dialog(client, d, storage, config, _log):
                     replied_count += 1
             except Exception as e:
                 _log(f"dialog error: {type(e).__name__}: {e}")
     except Exception as e:
-        _log(f"iter_dialogs error: {type(e).__name__}: {e}")
+        _log(f"GetDialogsRequest error: {type(e).__name__}: {e}")
+        
     return replied_count
 
 async def main():
@@ -38,7 +48,6 @@ async def main():
         padding = len(b64_clean) % 4
         if padding:
             b64_clean += "=" * (4 - padding)
-            
         raw = base64.b64decode(b64_clean)
         _log(f"decoded session size: {len(raw)} bytes")
         _log(f"session md5 hash: {hashlib.md5(raw).hexdigest()}")
