@@ -3,6 +3,7 @@
 #  All code and comments are English. No emojis.
 # ============================================
 import time
+from telethon.errors import ForbiddenError
 
 async def _last_message(client, entity, log, user_id):
     try:
@@ -53,6 +54,14 @@ async def process_dialog(client, dialog, entity, storage, config, log):
         await storage.add_replied(user_id, now_ts)
         log(f"successfully replied to {user_id}")
         return True
+        
+    except ForbiddenError as e:
+        # Catch privacy/payment errors to prevent infinite loops
+        log(f"skip {user_id}: Forbidden ({e.message[:50]}). User privacy blocks messages.")
+        # Save timestamp so it waits 8 hours before trying again
+        await storage.add_replied(user_id, now_ts)
+        return False
+        
     except Exception as e:
         log(f"send failed for user {user_id}: {type(e).__name__}: {e}")
         return False
