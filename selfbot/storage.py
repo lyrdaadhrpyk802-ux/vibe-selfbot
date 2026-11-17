@@ -31,23 +31,32 @@ class GistStorage:
                 raise RuntimeError(f"GIST_ID '{self._gist_id}' not found")
             if r.status != 200:
                 raise RuntimeError(f"gist load failed with status {r.status}")
-            
             data = await r.json()
             
         files = data.get("files") or {}
         entry = files.get(self._filename)
         if not entry:
-            return {"replied": []}
+            return {"replied": {}}
         content = entry.get("content") or ""
         if not content.strip():
-            return {"replied": []}
+            return {"replied": {}}
+            
         try:
             parsed = json.loads(content)
         except Exception:
-            return {"replied": []}
+            return {"replied": {}}
+            
         if not isinstance(parsed, dict):
-            return {"replied": []}
-        parsed.setdefault("replied", [])
+            return {"replied": {}}
+            
+        # Compatibility: Convert old list format to dict format
+        replied_data = parsed.get("replied", {})
+        if isinstance(replied_data, list):
+            # Old format: list of IDs. Convert to dict with 0 timestamp so they can reply immediately.
+            parsed["replied"] = {str(uid): 0 for uid in replied_data}
+        elif not isinstance(replied_data, dict):
+            parsed["replied"] = {}
+            
         return parsed
 
     async def _save_to_gist(self, session, payload):
@@ -73,16 +82,13 @@ class GistStorage:
     async def get_replied(self):
         async with self._lock:
             await self._ensure_cache()
-            return set(self._cache.get("replied") or [])
+            return self._cache.get("replied", {})
 
-    async def add_replied(self, user_id):
+    async def add_replied(self, user_id, timestamp):
         async with self._lock:
             await self._ensure_cache()
-            replied = set(self._cache.get("replied") or [])
-            if user_id in replied:
-                return False
-            replied.add(user_id)
-            self._cache["replied"] = sorted(replied)
+            replied = self._cache.get("replied", {})
+            replied[str(user_id)] = timestamp
+            self._cache["replied"] = replied
             async with aiohttp.ClientSession() as session:
                 await self._save_to_gist(session, self._cache)
-            return True

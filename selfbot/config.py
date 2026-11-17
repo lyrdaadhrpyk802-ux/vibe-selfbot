@@ -3,7 +3,6 @@
 #  All code and comments are English. No emojis.
 # ============================================
 import os
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 DEFAULT_REPLY_TEXT = "\u0641\u0639\u0644\u0627 \u062f\u0631 \u062f\u0633\u062a\u0631\u0633 \u0646\u06cc\u0633\u062a\u0645..."
@@ -30,10 +29,11 @@ class Config:
         self.gist_id = _env("GIST_ID", required=True)
         self.gist_filename = _env("GIST_FILENAME", "replied.json")
         self.session_path = Path(_env("VIBE_SESSION_PATH", "/tmp/vibe_selfbot"))
-        self.poll_interval = _env_int("POLL_INTERVAL", 10)
-        self.delay_seconds = _env_int("DELAY_SECONDS", 5)
+        self.poll_interval = _env_int("POLL_INTERVAL", 5) # Poll every 5 seconds
         self.reply_text = _env("REPLY_TEXT", DEFAULT_REPLY_TEXT)
+        
+        # Max runtime before GitHub kills the job (5h50m)
         self.max_runtime_seconds = _env_int("MAX_RUNTIME_SECONDS", 21000)
-
-    def is_within_work_hours(self):
-        return True # Currently always on
+        
+        # Cooldown: 8 hours in seconds
+        self.cooldown_seconds = _env_int("COOLDOWN_SECONDS", 8 * 3600)

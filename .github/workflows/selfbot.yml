@@ -36,8 +36,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           GIST_ID: ${{ secrets.GIST_ID }}
           GIST_FILENAME: replied.json
-          POLL_INTERVAL: "10"
-          DELAY_SECONDS: "5"
+          POLL_INTERVAL: "5"
           MAX_RUNTIME_SECONDS: "21000"
         run: |
           python -m selfbot.main
